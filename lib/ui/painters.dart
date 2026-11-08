@@ -592,6 +592,14 @@ class JoystickPainter extends CustomPainter {
 // ───────────────────────── Kontrol haritası (900x520) ─────────────────────────
 
 class MapPainter extends CustomPainter {
+  MapPainter({this.selected = -1});
+
+  /// Seçili İHA (0,1,2) – etrafında halka çizilir.
+  final int selected;
+
+  /// İHA konumları (900x520 tasarım koordinatı).
+  static const uavPos = [Offset(478, 228), Offset(555, 242), Offset(492, 348)];
+
   void _chip(Canvas c, String t, Offset at) {
     final tp = TextPainter(
       text: TextSpan(text: t, style: TextStyle(fontSize: 11, color: rgba(0xC8D6D9), letterSpacing: 1.1)),
@@ -669,6 +677,12 @@ class MapPainter extends CustomPainter {
     drawText(c, 'İHA-2', const Offset(600, 258), size: 13, w: FontWeight.w600);
     drawText(c, 'İHA-3', const Offset(540, 368), size: 13, w: FontWeight.w600, color: rgba(0xFF8480));
 
+    if (selected >= 0 && selected < uavPos.length) {
+      final p = uavPos[selected];
+      c.drawCircle(p, 40, _line(rgba(0x4DB2FF, .9), 2));
+      c.drawCircle(p, 48, _line(rgba(0x4DB2FF, .35), 1));
+    }
+
     _chip(c, 'WP-01', const Offset(240, 175));
     _chip(c, 'WP-03', const Offset(735, 175));
     _chip(c, 'WP-02', const Offset(655, 372));
@@ -677,7 +691,7 @@ class MapPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter o) => false;
+  bool shouldRepaint(covariant MapPainter o) => o.selected != selected;
 }
 
 // ───────────────────────── Yarı otonom haritası (900x460) ─────────────────────────

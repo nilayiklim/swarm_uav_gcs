@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'theme.dart';
+import 'uav_strip.dart';
 
 // ───────────────────────── Panel ─────────────────────────
 
@@ -203,7 +204,7 @@ class Dot extends StatelessWidget {
 
 // ───────────────────────── Metal buton ─────────────────────────
 
-enum BtnKind { normal, danger, dangerOutline, green, gray, redTint, accent }
+enum BtnKind { normal, danger, dangerOutline, green, gray, redTint, accent, amber }
 
 class MetalButton extends StatelessWidget {
   const MetalButton(
@@ -258,6 +259,12 @@ class MetalButton extends StatelessWidget {
       case BtnKind.redTint:
         grad = const [Color(0xFF4A1C21), Color(0xFF3A1519), Color(0xFF2E1115)];
         border = const Color(0xFF7A252B);
+        fg = const Color(0xFFFF8480);
+        break;
+      case BtnKind.amber:
+        grad = const [Color(0xFF3A2D10), Color(0xFF2E230C), Color(0xFF2A200B)];
+        border = const Color(0xFF8A6A22);
+        fg = C.amber;
         break;
       case BtnKind.accent:
         grad = const [Color(0xFF17402F), Color(0xFF102A20), Color(0xFF102A20)];
@@ -445,10 +452,11 @@ class FieldBox extends StatelessWidget {
 // ───────────────────────── Üst şerit ─────────────────────────
 
 class TopBar extends StatelessWidget {
-  const TopBar({super.key, required this.title, this.battery = '10%', this.simple = false});
+  const TopBar({super.key, required this.title, this.main = false});
   final String title;
-  final String battery;
-  final bool simple;
+
+  /// true: Ana Sayfa başlığı (HAZIR · ZENOH · SAAT); false: diğer sayfaların tam başlığı.
+  final bool main;
 
   @override
   Widget build(BuildContext context) {
@@ -470,22 +478,17 @@ class TopBar extends StatelessWidget {
           const SizedBox(width: 8),
           Text(title, style: ts(14.5, w: FontWeight.w600, ls: 1.3)),
           const SizedBox(width: 10),
-          if (simple)
+          if (main)
             const Tag('HAZIR', kind: TagKind.on, height: 26, fontSize: 10, ls: .8)
           else ...[
-            Flexible(
-              child: Text('TEKNOFEST 2026 · TAKIM-07',
-                  maxLines: 1, overflow: TextOverflow.ellipsis, style: ts(10.5, color: C.mut, ls: .6)),
-            ),
-            const SizedBox(width: 8),
             const Tag('SİSTEM AKTİF', kind: TagKind.on, height: 26, fontSize: 10, ls: .8),
             const SizedBox(width: 7),
             const Tag('YER İSTASYONU: BAĞLI', kind: TagKind.on, height: 26, fontSize: 10, ls: .8),
-            const SizedBox(width: 7),
+            const SizedBox(width: 8),
             Text('GPS 11', style: ts(13, color: C.mut)),
           ],
           const Spacer(),
-          if (simple) ...[
+          if (main) ...[
             Text('ZENOH: 12ms', style: ts(17, color: C.mut)),
             const SizedBox(width: 12),
             Text.rich(TextSpan(children: [
@@ -502,9 +505,50 @@ class TopBar extends StatelessWidget {
             const SizedBox(width: 10),
             const LiveBadge(),
             const SizedBox(width: 10),
-            Text('BATTERY $battery', style: ts(14)),
+            Text('BATTERY 10%', style: ts(14)),
           ],
+          const SizedBox(width: 12),
+          const ThemeToggle(),
         ],
+      ),
+    );
+  }
+}
+
+/// Koyu / açık tema anahtarı: iki ikonlu bölünmüş düğme (ay · güneş).
+class ThemeToggle extends StatelessWidget {
+  const ThemeToggle({super.key});
+
+  Widget _b(bool on, IconData icon, String tip, VoidCallback f) => Tooltip(
+        message: tip,
+        child: InkWell(
+          onTap: f,
+          child: Container(
+            width: 30,
+            height: 28,
+            decoration: BoxDecoration(color: on ? const Color(0xFF1F6B47) : Colors.transparent),
+            child: Icon(icon, size: 16, color: on ? Colors.white : C.mut),
+          ),
+        ),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<bool>(
+      valueListenable: lightMode,
+      builder: (context, light, _) => Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(2),
+          border: Border.all(color: const Color(0xFF33505A)),
+          color: const Color(0xFF18292E),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(2),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            _b(!light, Icons.dark_mode_outlined, 'Koyu tema', () => lightMode.value = false),
+            _b(light, Icons.light_mode_outlined, 'Açık tema', () => lightMode.value = true),
+          ]),
+        ),
       ),
     );
   }
@@ -575,7 +619,16 @@ class SideBar extends StatelessWidget {
   final int index;
   final ValueChanged<int> onSelect;
 
-  static const labels = ['KONTROL', 'YARI\nOTONOM', 'TELEMETRİ', 'PARAMETRE', 'KAMERA', 'KAYNAK'];
+  static const labels = [
+    'ANA\nSAYFA',
+    'YARI\nOTONOM',
+    'VERİLER',
+    'PARAMETRE',
+    'KAMERA',
+    'KAYNAK',
+    'LOG\nKAYITLARI',
+    'KOMUT\nMERKEZİ',
+  ];
   static const icons = <IconData>[
     Icons.dashboard,
     Icons.sports_esports_outlined,
@@ -583,6 +636,8 @@ class SideBar extends StatelessWidget {
     Icons.tune,
     Icons.videocam,
     Icons.receipt_long_outlined,
+    Icons.list_alt,
+    Icons.terminal,
   ];
 
   @override
@@ -598,13 +653,16 @@ class SideBar extends StatelessWidget {
         border: const Border(right: BorderSide(color: Color(0xFF1F3338))),
         boxShadow: [BoxShadow(color: rgba(0x3FD97F, .06), offset: const Offset(1, 0))],
       ),
-      child: Column(
-        children: [
-          const SizedBox(height: 16),
-          SizedBox(width: 38, height: 38, child: CustomPaint(painter: _LogoPainter())),
-          const SizedBox(height: 14),
-          for (int i = 0; i < labels.length; i++) _item(i),
-        ],
+      child: SingleChildScrollView(
+        child: Column(
+          children: [
+            const SizedBox(height: 14),
+            SizedBox(width: 38, height: 38, child: CustomPaint(painter: _LogoPainter())),
+            const SizedBox(height: 10),
+            for (int i = 0; i < labels.length; i++) _item(i),
+            const SizedBox(height: 8),
+          ],
+        ),
       ),
     );
   }
@@ -616,7 +674,7 @@ class SideBar extends StatelessWidget {
       onTap: () => onSelect(i),
       child: Container(
         width: 78,
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 2),
+        padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 2),
         decoration: on
             ? BoxDecoration(
                 gradient: LinearGradient(colors: [rgba(0x3FD97F, .18), rgba(0x3FD97F, 0)], stops: const [0, .9]),
@@ -806,23 +864,30 @@ class PageFrame extends StatelessWidget {
     this.bar = EmVariant.standard,
     this.battery = '10%',
     this.simple = false,
+    this.statusRow = false,
     this.extra,
   });
   final String title;
   final Widget body;
   final EmVariant bar;
   final String battery;
+
+  /// true: Ana Sayfa başlığı.
   final bool simple;
+
+  /// Başlık altında "BAĞLANTI ETKİN · YER İSTASYONU ONLİNE…" şeridi (Yarı Otonom).
+  final bool statusRow;
   final Widget? extra;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        TopBar(title: title, battery: battery, simple: simple),
-        if (simple) (extra ?? const SizedBox.shrink()) else const StatusRow(),
+        TopBar(title: title, main: simple),
+        const UavStrip(),
+        if (statusRow) const StatusRow(),
         Expanded(child: GridBg(child: body)),
-        EmergencyBar(variant: bar),
+        const EmergencyBar(),
       ],
     );
   }
