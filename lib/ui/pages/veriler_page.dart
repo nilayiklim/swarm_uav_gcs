@@ -30,7 +30,7 @@ class _P {
   final int extra; // "+N" rozeti
 }
 
-const _blue = Color(0xFF8EC9F5);
+Color get _blue => lc(0xFF8EC9F5);
 
 class _VerilerPageState extends State<VerilerPage> {
   int _sel = 0;
@@ -194,7 +194,7 @@ class _VerilerPageState extends State<VerilerPage> {
       children: [
         Expanded(
           flex: 5,
-          child: Text(r.k, maxLines: 1, overflow: TextOverflow.ellipsis, style: ts(13.5, color: const Color(0xFFC8D6D9))),
+          child: Text(r.k, maxLines: 1, overflow: TextOverflow.ellipsis, style: ts(13.5, color: lc(0xFFC8D6D9))),
         ),
         if (r.bar != null)
           Expanded(
@@ -203,7 +203,7 @@ class _VerilerPageState extends State<VerilerPage> {
               padding: const EdgeInsets.only(right: 12),
               child: Container(
                 height: 4,
-                decoration: BoxDecoration(color: const Color(0xFF2A3F45), borderRadius: BorderRadius.circular(2)),
+                decoration: BoxDecoration(color: lc(0xFF2A3F45), borderRadius: BorderRadius.circular(2)),
                 alignment: Alignment.centerLeft,
                 child: FractionallySizedBox(
                   widthFactor: r.bar!.clamp(0.0, 1.0).toDouble(),
@@ -237,7 +237,7 @@ class _VerilerPageState extends State<VerilerPage> {
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
                     color: rgba(0x3FD97F, .08),
-                    border: Border.all(color: const Color(0xFF2E9060)),
+                    border: Border.all(color: lc(0xFF2E9060)),
                     borderRadius: BorderRadius.circular(2),
                   ),
                   child: Text.rich(TextSpan(children: [
@@ -254,7 +254,7 @@ class _VerilerPageState extends State<VerilerPage> {
           for (final r in visible)
             Container(
               height: 36,
-              decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Color(0xFF1E3237)))),
+              decoration: BoxDecoration(border: Border(bottom: BorderSide(color: lc(0xFF1E3237)))),
               child: _row(r, true),
             ),
         ],
@@ -265,7 +265,7 @@ class _VerilerPageState extends State<VerilerPage> {
           for (final r in visible)
             Expanded(
               child: Container(
-                decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Color(0xFF1E3237)))),
+                decoration: BoxDecoration(border: Border(bottom: BorderSide(color: lc(0xFF1E3237)))),
                 child: _row(r, false),
               ),
             ),
@@ -277,7 +277,7 @@ class _VerilerPageState extends State<VerilerPage> {
       gap(8),
       Container(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-        decoration: BoxDecoration(border: Border.all(color: const Color(0xFF2E9060)), borderRadius: BorderRadius.circular(2)),
+        decoration: BoxDecoration(border: Border.all(color: lc(0xFF2E9060)), borderRadius: BorderRadius.circular(2)),
         child: Text('+${p.extra}', style: ts(10, color: C.green)),
       ),
       const Spacer(),
@@ -285,12 +285,19 @@ class _VerilerPageState extends State<VerilerPage> {
     ]);
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(2),
-        border: Border.all(color: hovered ? C.green : C.panelLine),
-        gradient: const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF183137), Color(0xFF12232A)]),
-        boxShadow: [BoxShadow(color: rgba(0x000000, hovered ? .6 : .3), blurRadius: hovered ? 26 : 12, offset: const Offset(0, 6))],
-      ),
+      decoration: isLight
+          ? BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: hovered ? L.gr : L.line),
+              boxShadow: hovered ? const [BoxShadow(color: Color(0x2E12303A), blurRadius: 22, offset: Offset(0, 8))] : L.shadow,
+            )
+          : BoxDecoration(
+              borderRadius: BorderRadius.circular(2),
+              border: Border.all(color: hovered ? C.green : C.panelLine),
+              gradient: const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF183137), Color(0xFF12232A)]),
+              boxShadow: [BoxShadow(color: Color(hovered ? 0x99000000 : 0x4D000000), blurRadius: hovered ? 26 : 12, offset: const Offset(0, 6))],
+            ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

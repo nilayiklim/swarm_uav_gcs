@@ -17,6 +17,7 @@ class UavInfo {
     this.hdop = 1.1,
     this.bad = false,
     this.tag,
+    this.standby = false,
   });
 
   final String name;
@@ -32,6 +33,7 @@ class UavInfo {
   final double hdop;
   final bool bad;
   final String? tag;
+  final bool standby;
 
   Color get pctColor => bad ? C.red : C.green;
 }
@@ -53,3 +55,21 @@ const kUavs = [
     tag: 'AYRILDI · MAVİ ALAN 12s',
   ),
 ];
+
+/// Şeritte gösterilen yedek İHA (yalnızca bekleme durumunda, haritada yok).
+const kStandbyUav = UavInfo(
+  name: 'YEDEK İHA',
+  pct: 100,
+  bat: 16.4,
+  alt: 0,
+  speed: 0,
+  vspeed: 0,
+  heading: 0,
+  roll: 0,
+  pitch: 0,
+  standby: true,
+  tag: 'BEKLEMEDE',
+);
+
+/// Üst şerit listesi: aktif İHA'lar + yedek.
+const List<UavInfo> kStripUavs = [...kUavs, kStandbyUav];

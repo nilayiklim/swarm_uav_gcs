@@ -6,6 +6,7 @@ import 'ui/theme.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  initThemeSwitching();
   // Haritada sağ tık menüsümüz var: tarayıcının kendi menüsünü kapat.
   if (kIsWeb) BrowserContextMenu.disableContextMenu();
   runApp(const SwarmUavApp());

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../widgets.dart';
 
-/// PARAMETRELER – içerik henüz belirlenmedi (başlık, İHA kutucukları ve Acil Şerit hazır).
+/// PARAMETRELER – içerik alanı bilerek boş bırakıldı (başlık, İHA şeridi ve alt şerit çerçevede kalır).
 class ParametrePage extends StatelessWidget {
   const ParametrePage({super.key});
 
@@ -9,7 +9,6 @@ class ParametrePage extends StatelessWidget {
   Widget build(BuildContext context) {
     return const PageFrame(
       title: 'SÜRÜ İHA // PARAMETRELER',
-      bar: EmVariant.standard,
       body: SizedBox.expand(),
     );
   }
