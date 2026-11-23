@@ -6,12 +6,14 @@ import 'pages/kontrol_page.dart';
 import 'pages/log_page.dart';
 import 'pages/parametre_page.dart';
 import 'pages/veriler_page.dart';
+import 'pages/yari_otonom2_page.dart';
 import 'pages/yari_otonom_page.dart';
 import 'theme.dart';
 import 'widgets.dart';
 
 /// Yan çubuk + sayfa değiştirme. Sıra:
-/// Ana Sayfa, Yarı Otonom, Veriler, Parametre, Kamera, Kaynak, Log Kayıtları, Komut Merkezi.
+/// Ana Sayfa, Yarı Otonom (harita), Yarı Otonom 2 (kumanda · Şartname 5.2), Veriler, Parametre, Kamera,
+/// Kaynak, Log Kayıtları, Komut Merkezi.
 /// Her sayfanın üstündeki başlık + İHA kutucukları + Acil Şerit [PageFrame] içindedir.
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
@@ -25,33 +27,32 @@ class _AppShellState extends State<AppShell> {
 
   @override
   Widget build(BuildContext context) {
-    return ThemeScope(
-      child: Scaffold(
-        backgroundColor: C.bg,
-        body: DefaultTextStyle(
-          style: ts(14),
-          child: Row(
-            children: [
-              SideBar(index: _index, onSelect: (i) => setState(() => _index = i)),
-              Expanded(
-                child: ScaleToFit(
-                  child: IndexedStack(
-                    index: _index,
-                    children: const [
-                      KontrolPage(),
-                      YariOtonomPage(),
-                      VerilerPage(),
-                      ParametrePage(),
-                      KameraPage(),
-                      KaynakPage(),
-                      LogPage(),
-                      KomutPage(),
-                    ],
-                  ),
+    return Scaffold(
+      backgroundColor: C.bg,
+      body: DefaultTextStyle(
+        style: ts(14),
+        child: Row(
+          children: [
+            SideBar(index: _index, onSelect: (i) => setState(() => _index = i)),
+            Expanded(
+              child: ScaleToFit(
+                child: IndexedStack(
+                  index: _index,
+                  children: const [
+                    KontrolPage(),
+                    YariOtonomPage(),
+                    YariOtonom2Page(),
+                    VerilerPage(),
+                    ParametrePage(),
+                    KameraPage(),
+                    KaynakPage(),
+                    LogPage(),
+                    KomutPage(),
+                  ],
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

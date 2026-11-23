@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
+import '../app_state.dart';
 import '../theme.dart';
 import '../uav_data.dart';
 import '../widgets.dart';
@@ -350,8 +351,8 @@ class _KomutPageState extends State<KomutPage> with SingleTickerProviderStateMix
         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(2),
-          color: on ? rgba(0x3FD97F, .12) : const Color(0xFF18292E),
-          border: Border.all(color: on ? C.green : const Color(0xFF2B4147)),
+          color: on ? rgba(0x3FD97F, .12) : lc(0xFF18292E),
+          border: Border.all(color: on ? C.green : lc(0xFF2B4147)),
         ),
         child: Text(t, style: ts(9.5, color: on ? C.green : C.mut, ls: .8, w: on ? FontWeight.w700 : FontWeight.w400)),
       );
@@ -378,7 +379,7 @@ class _KomutPageState extends State<KomutPage> with SingleTickerProviderStateMix
           children: [
             Expanded(child: Row(children: [Expanded(child: b('ARM', 'arm throttle', BtnKind.green)), gap(6), Expanded(child: b('KALKIŞ', 'takeoff 30', BtnKind.green))])),
             gap(6),
-            Expanded(child: Row(children: [Expanded(child: b('SÜRDÜR', 'resume', BtnKind.normal)), gap(6), Expanded(child: b('DURDUR', 'brake', BtnKind.amber))])),
+            Expanded(child: Row(children: [Expanded(child: b('SÜRÜYE KAT', 'resume', BtnKind.normal)), gap(6), Expanded(child: b('DURDUR', 'brake', BtnKind.amber))])),
             gap(6),
             Expanded(child: Row(children: [Expanded(child: b('EVE DÖN', 'rtl', BtnKind.redTint)), gap(6), Expanded(child: b('İNİŞ', 'land', BtnKind.redTint))])),
           ],
@@ -392,11 +393,11 @@ class _KomutPageState extends State<KomutPage> with SingleTickerProviderStateMix
           Positioned(
             left: 8,
             top: 6,
-            child: Text.rich(TextSpan(style: ts(11, color: C.mut, mono: true), children: [
+            child: Text.rich(TextSpan(style: ts(11, color: D.mut, mono: true), children: [
               const TextSpan(text: 'ALT '),
-              TextSpan(text: '${s.alt.toStringAsFixed(1)} m', style: ts(11, w: FontWeight.w700, mono: true)),
+              TextSpan(text: '${s.alt.toStringAsFixed(1)} m', style: ts(11, color: D.text, w: FontWeight.w700, mono: true)),
               const TextSpan(text: '   HIZ '),
-              TextSpan(text: '${s.speed.toStringAsFixed(1)} m/s', style: ts(11, w: FontWeight.w700, mono: true)),
+              TextSpan(text: '${s.speed.toStringAsFixed(1)} m/s', style: ts(11, color: D.text, w: FontWeight.w700, mono: true)),
             ])),
           ),
         ],
@@ -423,22 +424,23 @@ class _KomutPageState extends State<KomutPage> with SingleTickerProviderStateMix
   }
 
   Widget _lineW(_Line l) {
-    final tm = ts(12.5, color: C.mut, mono: true);
+    // Terminal her iki temada da koyu kalır: renkler [D] paletinden.
+    final tm = ts(12.5, color: D.mut, mono: true);
     final who = l.u < 0 ? '' : 'uav${l.u + 1}';
     switch (l.k) {
       case _K.sys:
-        return Text('${l.time}  ${l.text}', style: ts(12.5, color: C.mut, mono: true));
+        return Text('${l.time}  ${l.text}', style: ts(12.5, color: D.mut, mono: true));
       case _K.cmd:
         return Text.rich(TextSpan(children: [
           TextSpan(text: '${l.time}  ', style: tm),
-          TextSpan(text: '$who> ', style: ts(12.5, color: C.green, mono: true)),
-          TextSpan(text: l.text, style: ts(12.5, mono: true)),
+          TextSpan(text: '$who> ', style: ts(12.5, color: D.green, mono: true)),
+          TextSpan(text: l.text, style: ts(12.5, color: D.text, mono: true)),
         ]));
       default:
-        final col = l.k == _K.ok ? C.green : (l.k == _K.warn ? C.amber : C.red);
+        final col = l.k == _K.ok ? D.green : (l.k == _K.warn ? D.amber : D.red);
         return Text.rich(TextSpan(children: [
           TextSpan(text: '${l.time}  ', style: tm),
-          TextSpan(text: '$who  ', style: ts(12.5, color: C.mut2, mono: true)),
+          TextSpan(text: '$who  ', style: ts(12.5, color: D.mut2, mono: true)),
           TextSpan(text: l.text, style: ts(12.5, color: col, mono: true)),
         ]));
     }
@@ -447,103 +449,127 @@ class _KomutPageState extends State<KomutPage> with SingleTickerProviderStateMix
   Widget _terminal() {
     final lines = _tab == 3 ? _log : _log.where((l) => l.u == _tab || l.u < 0).toList();
     final names = ['İHA-1', 'İHA-2', 'İHA-3', 'TÜMÜ'];
-    return Panel(
-      padding: EdgeInsets.zero,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Container(
-            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-            decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Color(0xFF1E3237)))),
-            child: Row(children: [
-              Text('KOMUT TERMİNALİ', style: ts(13.5, w: FontWeight.w700, ls: 1.2)),
-              gap(12),
-              for (int i = 0; i < 4; i++)
-                GestureDetector(
-                  onTap: () => setState(() => _tab = i),
-                  child: Padding(
-                    padding: const EdgeInsets.only(right: 6),
-                    child: Tag(names[i], kind: _tab == i ? TagKind.on : TagKind.normal, height: 28, fontSize: 11.5, ls: 1),
-                  ),
-                ),
-              const Spacer(),
-              const Tag('● MAVLink bağlı', kind: TagKind.on, height: 28, fontSize: 11.5, ls: .4),
-            ]),
-          ),
-          Expanded(
-            child: Container(
-              color: const Color(0xFF050B0D),
-              padding: const EdgeInsets.fromLTRB(14, 10, 14, 6),
-              child: KeepDark(
-                child: ListView.builder(
-                  controller: _scroll,
-                  itemCount: lines.length,
-                  itemBuilder: (_, i) => Padding(padding: const EdgeInsets.symmetric(vertical: 2), child: _lineW(lines[i])),
+    final light = isLight;
+    // Terminal açık temada da koyu bir "ada"dır; widget renkleri [D] paletinden gelir.
+    final inner = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+          decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: D.termLine))),
+          child: Row(children: [
+            Text('KOMUT TERMİNALİ', style: ts(13.5, color: D.text, w: FontWeight.w700, ls: 1.2)),
+            gap(12),
+            for (int i = 0; i < 4; i++)
+              GestureDetector(
+                onTap: () => setState(() => _tab = i),
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: Tag(names[i], kind: _tab == i ? TagKind.on : TagKind.normal, height: 28, fontSize: 11.5, ls: 1, dark: true),
                 ),
               ),
+            const Spacer(),
+            const Tag('● MAVLink bağlı', kind: TagKind.on, height: 28, fontSize: 11.5, ls: .4, dark: true),
+          ]),
+        ),
+        Expanded(
+          child: Container(
+            color: D.term,
+            padding: const EdgeInsets.fromLTRB(14, 10, 14, 6),
+            child: ListView.builder(
+              controller: _scroll,
+              itemCount: lines.length,
+              itemBuilder: (_, i) => Padding(padding: const EdgeInsets.symmetric(vertical: 2), child: _lineW(lines[i])),
             ),
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            decoration: const BoxDecoration(color: Color(0xFF050B0D), border: Border(top: BorderSide(color: Color(0xFF1E3237)))),
-            child: Row(
-              children: [
-                Text('${_tab == 3 ? "tümü" : "uav${_tab + 1}"}>', style: ts(13.5, color: C.green, mono: true, w: FontWeight.w700)),
-                gap(8),
-                Expanded(
-                  child: Focus(
-                    onKeyEvent: (node, e) {
-                      _key(e);
-                      return KeyEventResult.ignored;
-                    },
-                    child: TextField(
-                      controller: _ctl,
-                      focusNode: _focus,
-                      onSubmitted: _submit,
-                      style: ts(13.5, mono: true),
-                      cursorColor: C.green,
-                      decoration: InputDecoration(
-                        isDense: true,
-                        border: InputBorder.none,
-                        hintText: 'komut yazın…  ör. takeoff 20',
-                        hintStyle: ts(13.5, color: C.mut, mono: true),
-                        contentPadding: const EdgeInsets.symmetric(vertical: 14),
-                      ),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          decoration: const BoxDecoration(color: D.term, border: Border(top: BorderSide(color: D.termLine))),
+          child: Row(
+            children: [
+              Text('${_tab == 3 ? "tümü" : "uav${_tab + 1}"}>', style: ts(13.5, color: D.green, mono: true, w: FontWeight.w700)),
+              gap(8),
+              Expanded(
+                child: Focus(
+                  onKeyEvent: (node, e) {
+                    _key(e);
+                    return KeyEventResult.ignored;
+                  },
+                  child: TextField(
+                    controller: _ctl,
+                    focusNode: _focus,
+                    onSubmitted: _submit,
+                    style: ts(13.5, color: D.text, mono: true),
+                    cursorColor: D.green,
+                    decoration: InputDecoration(
+                      isDense: true,
+                      border: InputBorder.none,
+                      hintText: 'komut yazın…  ör. takeoff 20',
+                      hintStyle: ts(13.5, color: D.mut, mono: true),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 14),
                     ),
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
+    if (light) {
+      return Container(
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: const Color(0xFF0B1519),
+          borderRadius: BorderRadius.circular(8),
+          boxShadow: L.shadow,
+        ),
+        child: inner,
+      );
+    }
+    return Panel(padding: EdgeInsets.zero, child: inner);
   }
 
   @override
   Widget build(BuildContext context) {
     return PageFrame(
       title: 'SÜRÜ İHA // KOMUT MERKEZİ',
-      body: Padding(
-        padding: const EdgeInsets.all(8),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(
-              flex: 11,
-              child: Column(
-                children: [
-                  for (int u = 0; u < 3; u++) ...[
-                    if (u > 0) gap(8),
-                    Expanded(flex: _sel == -1 ? 10 : (_sel == u ? 24 : 6), child: _card(u, mini: _sel != -1 && _sel != u)),
-                  ],
-                ],
-              ),
+      body: ValueListenableBuilder<bool>(
+        valueListenable: raceMode,
+        builder: (context, race, _) {
+          if (race) {
+            return const LockedNotice(
+              title: 'KOMUT MERKEZİ KİLİTLİ',
+              lines: [
+                'Yarışma Modu aktif: İHA başına manuel komut, terminal ve simülasyon devre dışıdır.',
+                'Görev tüm sürü için tek "GÖREVİ BAŞLAT" komutuyla, otonom olarak yürütülür.',
+                'Komut Merkezi yalnızca "TEST / SİMÜLASYON MODU"nda kullanılabilir.',
+              ],
+            );
+          }
+          return Padding(
+            padding: const EdgeInsets.all(8),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  flex: 11,
+                  child: Column(
+                    children: [
+                      for (int u = 0; u < 3; u++) ...[
+                        if (u > 0) gap(8),
+                        Expanded(flex: _sel == -1 ? 10 : (_sel == u ? 24 : 6), child: _card(u, mini: _sel != -1 && _sel != u)),
+                      ],
+                    ],
+                  ),
+                ),
+                gap(8),
+                Expanded(flex: 10, child: _terminal()),
+              ],
             ),
-            gap(8),
-            Expanded(flex: 10, child: _terminal()),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -562,7 +588,7 @@ class _ScenePainter extends CustomPainter {
     final gy = h * .8; // zemin çizgisi
     c.drawRect(
       Rect.fromLTWH(0, 0, w, h),
-      Paint()..shader = const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF16323F), Color(0xFF2B5560), Color(0xFF5E8A8C)]).createShader(Rect.fromLTWH(0, 0, w, h)),
+      Paint()..shader = LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [lc(0xFF16323F), lc(0xFF2B5560), lc(0xFF5E8A8C)]).createShader(Rect.fromLTWH(0, 0, w, h)),
     );
     // bulutlar
     final cl = Paint()..color = rgba(0xFFFFFF, .07);
@@ -585,7 +611,7 @@ class _ScenePainter extends CustomPainter {
       c.drawRect(Rect.fromLTWH(x, gy + 2 + rw / 2 - 1, 28, 2), dash);
     }
     drawTextSmall(c, 'HOME', Offset(w * .18 - (moving ? 0 : 0), gy + 2 + rw + 8));
-    // uçak
+    // çok rotorlu İHA
     final alt = s.alt;
     final yPlane = gy - 10 - (alt / 60).clamp(0.0, 1.0) * (gy - h * .28);
     final xPlane = w * (s.ph == Ph.ground ? .3 : .5);
@@ -631,55 +657,42 @@ class _ScenePainter extends CustomPainter {
     c.drawPath(p, Paint()..color = col);
   }
 
-  /// Sabit kanatlı İHA – yandan görünüm, uzunluk ≈ len.
+  /// Çok rotorlu (quadcopter) İHA – yandan görünüm, genişlik ≈ len.
   void _plane(Canvas c, double len, bool armed) {
     c.scale(len / 100);
-    final body = Paint()..color = const Color(0xFFDCE4E6);
-    final dark = Paint()..color = const Color(0xFF8CA0A5);
-    final fus = Path()
-      ..moveTo(-50, 0)
-      ..quadraticBezierTo(-44, -8, -20, -8)
-      ..lineTo(26, -6)
-      ..quadraticBezierTo(46, -2, 52, 2)
-      ..quadraticBezierTo(40, 8, 10, 8)
-      ..lineTo(-24, 6)
-      ..quadraticBezierTo(-44, 6, -50, 0)
-      ..close();
-    c.drawPath(fus, body);
-    c.drawPath(
-      Path()
-        ..moveTo(-46, -2)
-        ..lineTo(-58, -22)
-        ..lineTo(-44, -22)
-        ..lineTo(-30, -7)
-        ..close(),
-      dark,
-    );
-    c.drawRect(const Rect.fromLTWH(-56, -3, 22, 3), dark);
-    c.drawPath(
-      Path()
-        ..moveTo(-6, 0)
-        ..lineTo(8, 0)
-        ..lineTo(12, 6)
-        ..lineTo(-2, 6)
-        ..close(),
-      dark,
-    );
-    c.drawPath(
-      Path()
-        ..moveTo(12, -6)
-        ..quadraticBezierTo(24, -12, 34, -4)
-        ..close(),
-      Paint()..color = const Color(0xFF4DB2FF),
-    );
+    final body = Paint()..color = lc(0xFFDCE4E6);
+    final dark = Paint()..color = lc(0xFF8CA0A5);
+    final arm = Paint()
+      ..color = lc(0xFF6F8388)
+      ..strokeWidth = 3
+      ..strokeCap = StrokeCap.round;
+    // iniş takımı
+    final leg = Paint()
+      ..color = lc(0xFF8CA0A5)
+      ..strokeWidth = 2
+      ..strokeCap = StrokeCap.round;
+    c.drawLine(const Offset(-14, 8), const Offset(-20, 20), leg);
+    c.drawLine(const Offset(14, 8), const Offset(20, 20), leg);
+    c.drawLine(const Offset(-26, 20), const Offset(-14, 20), leg);
+    c.drawLine(const Offset(14, 20), const Offset(26, 20), leg);
+    // kollar
+    c.drawLine(const Offset(-10, -2), const Offset(-42, -10), arm);
+    c.drawLine(const Offset(10, -2), const Offset(42, -10), arm);
+    // gövde
+    c.drawRRect(RRect.fromRectAndRadius(const Rect.fromLTWH(-16, -8, 32, 16), const Radius.circular(6)), body);
+    c.drawRRect(RRect.fromRectAndRadius(const Rect.fromLTWH(-9, 2, 18, 6), const Radius.circular(2)), dark);
+    c.drawCircle(const Offset(10, -1), 3, Paint()..color = lc(0xFF4DB2FF));
+    // motor + pervane
     final ang = armed ? (DateTime.now().millisecondsSinceEpoch / 30) : 0.0;
     final pr = Paint()
-      ..color = rgba(0xFFFFFF, armed ? .35 : .8)
-      ..strokeWidth = 2.5;
-    final ph = armed ? 14 * math.sin(ang) : 14.0;
-    c.drawLine(Offset(54, -ph), Offset(54, ph), pr);
-    c.drawRect(const Rect.fromLTWH(-4, 8, 2, 6), dark);
-    c.drawCircle(const Offset(-3, 15), 3, Paint()..color = const Color(0xFF222B2E));
+      ..color = rgba(0xFFFFFF, armed ? .35 : .85)
+      ..strokeWidth = 2.5
+      ..strokeCap = StrokeCap.round;
+    final ph = armed ? 16 * math.sin(ang) : 16.0;
+    for (final x in const [-42.0, 42.0]) {
+      c.drawRect(Rect.fromLTWH(x - 3, -14, 6, 5), dark);
+      c.drawLine(Offset(x - ph, -16), Offset(x + ph, -16), pr);
+    }
   }
 
   @override

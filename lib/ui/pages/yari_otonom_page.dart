@@ -2,13 +2,16 @@ import 'dart:math' as math;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import '../app_state.dart';
 import '../painters.dart';
 import '../theme.dart';
 import '../widgets.dart';
 
 /// YARI OTONOM – Mission Planner tarzı harita.
-/// 1) İHA'ya tıkla  2) Haritada sağ tık (dokunmatikte uzun bas)  3) "Buraya Uç".
+/// 1) İHA'ya tıkla  2) Haritaya sol tık = "Buraya Uç"; sağ tık (dokunmatikte uzun bas) = menü.
 /// Hedef verilen İHA animasyonla hedefe gider; mesafe ve yön üstteki kutuda görünür.
+/// Formasyon kutularına (Ok Başı / V / Çizgi) basınca sürü o forma animasyonla geçer.
+/// Not: şu an tamamı simülasyondur (gerçek MAVLink/ArduPilot bağlantısı yok).
 class YariOtonomPage extends StatefulWidget {
   const YariOtonomPage({super.key});
 
@@ -32,8 +35,15 @@ class _YariOtonomPageState extends State<YariOtonomPage> with SingleTickerProvid
   double _toastT = 0;
   Offset _cursor = const Offset(500, 172);
 
-  int _form = 0;
+  int _form = 1; // 0 Ok Başı, 1 V, 2 Çizgi (Şekil 3 sırası)
+  String _formMsg = ''; // formasyona geçiş sürerken adı; bitince boşalır
+  Offset _tapAt = Offset.zero;
   final List<double> _par = [10, 10, 1.0, 1.0]; // yaw hızı, yaw ivmesi, hız, ivme
+
+  static const _formNames = ['Ok Başı Formasyonu', 'V Formasyonu', 'Çizgi Formasyonu'];
+
+  /// Harita komutları yalnızca şartname kilidi açıkken (test modu ya da görsel demo) çalışır.
+  bool get _locked => raceMode.value && !kDemoKomut;
 
   late final Ticker _ticker;
   Duration _last = Duration.zero;
@@ -62,11 +72,19 @@ class _YariOtonomPageState extends State<YariOtonomPage> with SingleTickerProvid
       final dist = d.distance;
       if (dist < 3) {
         _target[i] = null;
-        _say('İHA-${i + 1} hedefe ulaştı');
+        if (_formMsg.isEmpty) {
+          _say('İHA-${i + 1} hedefe ulaştı');
+        } else {
+          _hdg[i] = 0; // formasyonda hepsi ileri (yukarı) bakar
+        }
         continue;
       }
       _hdg[i] = math.atan2(d.dx, -d.dy) * 180 / math.pi;
       _pos[i] += d / dist * math.min(dist, 55 * dt);
+    }
+    if (_formMsg.isNotEmpty && _target.every((t) => t == null)) {
+      _say('$_formMsg tamamlandı');
+      _formMsg = '';
     }
     if (_toastT > 0) _toastT -= dt;
     if (mounted) setState(() {});
@@ -89,9 +107,54 @@ class _YariOtonomPageState extends State<YariOtonomPage> with SingleTickerProvid
   }
 
   void _openMenu(Offset local, Size s) {
+    if (_locked) return; // şartname kilidi: yarışma modunda (demo kapalıyken) sağ-tık menüsü yok
     setState(() {
       _menuAt = local;
       _menuWorld = _toWorld(local, s);
+    });
+  }
+
+  /// Sol tık: boş haritaya basınca seçili İHA oraya uçar; İHA'ya basınca o İHA seçilir.
+  void _mapTap(Size s) {
+    final w = _toWorld(_tapAt, s);
+    final h = _hit(w);
+    setState(() {
+      if (h >= 0) {
+        _sel = h;
+        _menuAt = null;
+      } else if (_menuAt != null) {
+        _menuAt = null; // açık menüyü kapat, uçurma
+      } else if (!_locked) {
+        _formMsg = '';
+        _target[_sel] = w;
+        _say('İHA-${_sel + 1}: hedef ayarlandı');
+      }
+    });
+  }
+
+  /// Formasyon kutusu: sürünün ağırlık merkezi etrafında üç yuva belirler, İHA'lar oraya uçar.
+  /// Yuvalar (üstten görünüş, ileri = yukarı): Ok Başı = lider önde, kanatlar geride;
+  /// V = kanatlar önde yanlarda, biri geride ortada; Çizgi = yan yana.
+  void _setForm(int k) {
+    const d = 150.0;
+    final slots = <List<Offset>>[
+      [const Offset(-d, .6 * d), const Offset(0, -.6 * d), const Offset(d, .6 * d)], // Ok Başı
+      [const Offset(-d, -.6 * d), const Offset(0, .6 * d), const Offset(d, -.6 * d)], // V
+      [const Offset(-d, 0), Offset.zero, const Offset(d, 0)], // Çizgi
+    ];
+    var c = (_pos[0] + _pos[1] + _pos[2]) / 3;
+    c = Offset(
+      c.dx.clamp(d + 40, _w - d - 40).toDouble(),
+      c.dy.clamp(.6 * d + 40, _h - .6 * d - 40).toDouble(),
+    );
+    setState(() {
+      _menuAt = null;
+      _form = k;
+      _formMsg = _formNames[k];
+      for (int i = 0; i < 3; i++) {
+        _target[i] = c + slots[k][i];
+      }
+      _say('Formasyona geçiliyor: ${_formNames[k]}');
     });
   }
 
@@ -102,6 +165,7 @@ class _YariOtonomPageState extends State<YariOtonomPage> with SingleTickerProvid
       switch (a) {
         case 'fly':
         case 'flyalt':
+          _formMsg = '';
           _target[_sel] = w;
           _say('İHA-${_sel + 1}: ${a == 'fly' ? 'Buraya Uç' : 'İrtifa ile Buraya Uç (40 m)'} → hedef ayarlandı');
           break;
@@ -122,7 +186,7 @@ class _YariOtonomPageState extends State<YariOtonomPage> with SingleTickerProvid
         decoration: BoxDecoration(
           color: rgba(0x0C171A, .88),
           borderRadius: BorderRadius.circular(2),
-          border: Border.all(color: const Color(0xFF3B5258)),
+          border: Border.all(color: lc(0xFF3B5258)),
         ),
         child: c,
       );
@@ -152,7 +216,7 @@ class _YariOtonomPageState extends State<YariOtonomPage> with SingleTickerProvid
           decoration: BoxDecoration(
             color: rgba(0x0C171A, .88),
             borderRadius: BorderRadius.circular(2),
-            border: Border.all(color: const Color(0xFF3B5258)),
+            border: Border.all(color: lc(0xFF3B5258)),
           ),
           child: Text(t, style: ts(16)),
         ),
@@ -165,7 +229,7 @@ class _YariOtonomPageState extends State<YariOtonomPage> with SingleTickerProvid
       final p = _pos[_sel];
       final hasT = tg != null;
       final bearing = hasT ? ((math.atan2(tg.dx - p.dx, -(tg.dy - p.dy)) * 180 / math.pi) + 360) % 360 : 0.0;
-      return KeepDark(
+      return Plain(
         child: ClipRRect(
           borderRadius: BorderRadius.circular(2),
           child: MouseRegion(
@@ -176,14 +240,8 @@ class _YariOtonomPageState extends State<YariOtonomPage> with SingleTickerProvid
               },
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
-                onTapDown: (d) {
-                  final w = _toWorld(d.localPosition, size);
-                  final h = _hit(w);
-                  setState(() {
-                    _menuAt = null;
-                    if (h >= 0) _sel = h;
-                  });
-                },
+                onTapDown: (d) => _tapAt = d.localPosition,
+                onTap: () => _mapTap(size),
                 onLongPressStart: (d) => _openMenu(d.localPosition, size),
                 child: Stack(
                   fit: StackFit.expand,
@@ -194,11 +252,17 @@ class _YariOtonomPageState extends State<YariOtonomPage> with SingleTickerProvid
                     Positioned(
                       left: 12,
                       top: 12,
-                      child: _chip(Row(mainAxisSize: MainAxisSize.min, children: [
-                        _step('1', 'İHA seç: ', true, bold: 'İHA-${_sel + 1}'),
-                        _step('2', 'Haritada sağ tık', _menuAt != null || hasT),
-                        _step('3', 'Buraya Uç', hasT),
-                      ])),
+                      child: _chip(_locked
+                          ? Row(mainAxisSize: MainAxisSize.min, children: [
+                              Icon(Icons.lock_outline, size: 14, color: C.amber),
+                              gap(6),
+                              Text('YARIŞMA MODU · harita salt okunur (komut yok)', style: ts(11.5, color: C.amber, w: FontWeight.w600)),
+                            ])
+                          : Row(mainAxisSize: MainAxisSize.min, children: [
+                              _step('1', 'İHA seç: ', true, bold: 'İHA-${_sel + 1}'),
+                              _step('2', 'Haritaya tıkla · sağ tık menü', _menuAt != null || hasT),
+                              _step('3', 'Buraya Uç', hasT),
+                            ])),
                     ),
                     Positioned(
                       left: 12,
@@ -240,7 +304,7 @@ class _YariOtonomPageState extends State<YariOtonomPage> with SingleTickerProvid
                       left: 12,
                       bottom: 12,
                       child: _chip(Text.rich(TextSpan(children: [
-                        TextSpan(text: 'Lat ${(37.8712 + (_h / 2 - _cursor.dy) * 0.00001).toStringAsFixed(6)}   Lon ${(32.4981 + (_cursor.dx - _w / 2) * 0.00001).toStringAsFixed(6)}   Alt 1021 m (SRTM)   ·   HDOP 1.1   ·   Uydu 11   ·   ', style: ts(11.5, color: const Color(0xFFB9CBCF), mono: true)),
+                        TextSpan(text: 'Lat ${(37.8712 + (_h / 2 - _cursor.dy) * 0.00001).toStringAsFixed(6)}   Lon ${(32.4981 + (_cursor.dx - _w / 2) * 0.00001).toStringAsFixed(6)}   Alt 1021 m (SRTM)   ·   HDOP 1.1   ·   Uydu 11   ·   ', style: ts(11.5, color: lc(0xFFB9CBCF), mono: true)),
                         TextSpan(text: 'GUIDED', style: ts(11.5, color: C.amber, w: FontWeight.w700, ls: 1)),
                       ]))),
                     ),
@@ -257,8 +321,8 @@ class _YariOtonomPageState extends State<YariOtonomPage> with SingleTickerProvid
                         child: Container(
                           width: 240,
                           decoration: BoxDecoration(
-                            color: const Color(0xFF0C171A),
-                            border: Border.all(color: const Color(0xFF3B5258)),
+                            color: lc(0xFF0C171A),
+                            border: Border.all(color: lc(0xFF3B5258)),
                             borderRadius: BorderRadius.circular(2),
                             boxShadow: [BoxShadow(color: rgba(0x000000, .5), blurRadius: 14)],
                           ),
@@ -287,10 +351,10 @@ class _YariOtonomPageState extends State<YariOtonomPage> with SingleTickerProvid
           alignment: Alignment.centerLeft,
           padding: const EdgeInsets.symmetric(horizontal: 10),
           decoration: BoxDecoration(
-            color: first ? const Color(0xFF1F4D3A) : null,
-            border: first ? null : const Border(top: BorderSide(color: Color(0xFF2A4046))),
+            color: first ? lc(0xFF1F4D3A) : null,
+            border: first ? null : Border(top: BorderSide(color: lc(0xFF2A4046))),
           ),
-          child: Text(t, style: ts(12.5, w: first ? FontWeight.w700 : FontWeight.w500, color: first ? const Color(0xFFEFFFF6) : const Color(0xFFD5E0E2))),
+          child: Text(t, style: ts(12.5, w: first ? FontWeight.w700 : FontWeight.w500, color: first ? lc(0xFFEFFFF6) : lc(0xFFD5E0E2))),
         ),
       );
 
@@ -298,20 +362,23 @@ class _YariOtonomPageState extends State<YariOtonomPage> with SingleTickerProvid
     final on = _form == i;
     return Expanded(
       child: GestureDetector(
-        onTap: () => setState(() => _form = i),
+        onTap: _locked ? null : () => _setForm(i),
         child: Container(
           margin: EdgeInsets.only(left: i == 0 ? 0 : 8),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(2),
-            color: on ? const Color(0xFF17402F) : const Color(0xFF18292E),
-            border: Border.all(color: on ? C.green : const Color(0xFF33505A), width: on ? 1.5 : 1),
+            color: on ? lc(0xFF17402F) : lc(0xFF18292E),
+            border: Border.all(color: on ? C.green : lc(0xFF33505A), width: on ? 1.5 : 1),
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              SizedBox(width: 58, height: 38, child: CustomPaint(painter: FormationIconPainter(i, color: on ? C.green : C.text))),
-              gap(6),
-              Text(label, style: ts(14, color: on ? C.green : C.text)),
+              SizedBox(width: 108, height: 43, child: CustomPaint(painter: FormationIconPainter(i, color: on ? C.green : C.text))),
+              gap(3),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: FittedBox(fit: BoxFit.scaleDown, child: Text(label, style: ts(12.5, color: on ? C.green : C.text))),
+              ),
             ],
           ),
         ),
@@ -322,33 +389,76 @@ class _YariOtonomPageState extends State<YariOtonomPage> with SingleTickerProvid
   Widget _param(int i, String label, String unit, double step, double min, double max) {
     final v = _par[i];
     Widget btn(String t, double d) => GestureDetector(
-          onTap: () => setState(() => _par[i] = (v + d).clamp(min, max).toDouble()),
+          onTap: raceMode.value ? null : () => setState(() => _par[i] = (v + d).clamp(min, max).toDouble()),
           child: Container(
             width: 26,
             height: 26,
             alignment: Alignment.center,
-            decoration: BoxDecoration(border: Border.all(color: const Color(0xFF33505A)), borderRadius: BorderRadius.circular(2)),
+            decoration: BoxDecoration(border: Border.all(color: lc(0xFF33505A)), borderRadius: BorderRadius.circular(2)),
             child: Text(t, style: ts(15)),
           ),
         );
     return Expanded(
       child: Container(
         margin: EdgeInsets.only(left: i == 0 ? 0 : 8),
-        decoration: BoxDecoration(color: C.dark, borderRadius: BorderRadius.circular(2), border: Border.all(color: const Color(0xFF27393F))),
+        decoration: BoxDecoration(color: C.dark, borderRadius: BorderRadius.circular(2), border: Border.all(color: lc(0xFF27393F))),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(label, style: ts(12.5, color: C.mut)),
+            Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: ts(12.5, color: C.mut)),
             gap(4),
-            Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-              btn('−', -step),
-              gap(8),
-              Text('${v == v.roundToDouble() && step >= 1 ? v.toInt() : v.toStringAsFixed(1)}$unit', style: ts(17, w: FontWeight.w700)),
-              gap(8),
-              btn('+', step),
-            ]),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                btn('−', -step),
+                gap(8),
+                Text('${v == v.roundToDouble() && step >= 1 ? v.toInt() : v.toStringAsFixed(1)}$unit', style: ts(17, w: FontWeight.w700)),
+                gap(8),
+                btn('+', step),
+              ]),
+            ),
           ],
         ),
+      ),
+    );
+  }
+
+  /// RC komutları (Pitch / Roll / Throttle / Yaw) – salt okunur giriş monitörü.
+  Widget _rcMonitor() {
+    final v = [
+      math.sin(_t * 0.9) * .55, // Pitch  (+ ileri)
+      math.sin(_t * 0.7 + 1) * .35, // Roll
+      .15 + math.sin(_t * 0.5) * .2, // Throttle (+ yukarı)
+      math.sin(_t * 1.1 + 2) * .4, // Yaw
+    ];
+    const names = ['PITCH', 'ROLL', 'THR', 'YAW'];
+    const hints = ['ileri/geri', 'sağ/sol', 'yukarı/aşağı', 'dönüş'];
+    return Panel(
+      title: 'RC GİRİŞ MONİTÖRÜ',
+      trailing: const Tag('SÜRÜ HAREKET MODU', fontSize: 10, height: 22),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          for (int i = 0; i < 4; i++)
+            Expanded(
+              child: Row(children: [
+                SizedBox(width: 44, child: Text(names[i], style: ts(11, color: C.label, w: FontWeight.w600, ls: .6))),
+                Expanded(
+                  child: LayoutBuilder(builder: (context, b) {
+                    final mid = b.maxWidth / 2;
+                    final x = mid + v[i] * mid;
+                    return Stack(alignment: Alignment.centerLeft, children: [
+                      Container(height: 6, decoration: BoxDecoration(color: C.dark, borderRadius: BorderRadius.circular(3))),
+                      Positioned(left: mid - 1, child: Container(width: 2, height: 12, color: C.mut)),
+                      Positioned(left: math.min(mid, x), child: Container(width: (x - mid).abs(), height: 6, color: C.green)),
+                    ]);
+                  }),
+                ),
+                gap(6),
+                SizedBox(width: 64, child: Text(hints[i], style: ts(10, color: C.mut))),
+              ]),
+            ),
+        ],
       ),
     );
   }
@@ -378,15 +488,21 @@ class _YariOtonomPageState extends State<YariOtonomPage> with SingleTickerProvid
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Expanded(
+                    flex: 5,
                     child: Panel(
                       title: 'FORMASYON SEÇİCİ',
-                      child: Row(children: [_formTile(0, 'V Formasyon'), _formTile(1, 'Ok Formasyon'), _formTile(2, 'Çizgi Formasyon')]),
+                      trailing: _locked
+                          ? const Tag('SALT OKUNUR · QR\'DAN', kind: TagKind.amber, fontSize: 10, height: 22)
+                          : (raceMode.value ? const Tag('GÖRSEL DEMO · TIKLA', kind: TagKind.amber, fontSize: 10, height: 22) : null),
+                      child: Row(children: [_formTile(0, _formNames[0]), _formTile(1, _formNames[1]), _formTile(2, _formNames[2])]),
                     ),
                   ),
                   gap(8),
                   Expanded(
+                    flex: 6,
                     child: Panel(
                       title: 'HAREKET PARAMETRELERİ',
+                      trailing: raceMode.value ? const Tag('SALT OKUNUR', kind: TagKind.amber, fontSize: 10, height: 22) : null,
                       child: Row(children: [
                         _param(0, 'Yaw Hızı', '°/s', 1, 1, 90),
                         _param(1, 'Yaw İvmesi', '°/s²', 1, 1, 90),
@@ -395,6 +511,8 @@ class _YariOtonomPageState extends State<YariOtonomPage> with SingleTickerProvid
                       ]),
                     ),
                   ),
+                  gap(8),
+                  Expanded(flex: 4, child: _rcMonitor()),
                 ],
               ),
             ),
@@ -434,7 +552,7 @@ class _MapPainter extends CustomPainter {
 
   void _label(Canvas c, String t, Offset at, {Color color = Colors.white, double size = 12.5, bool bg = true}) {
     final tp = TextPainter(text: TextSpan(text: t, style: TextStyle(fontSize: size, color: color, fontWeight: FontWeight.w700)), textDirection: TextDirection.ltr)..layout();
-    if (bg) c.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(at.dx, at.dy, tp.width + 14, 20), const Radius.circular(2)), _f(rgba(0x050B0D, .85)));
+    if (bg) c.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(at.dx, at.dy, tp.width + 14, 20), const Radius.circular(2)), _f(const Color(0xD90A1A20)));
     tp.paint(c, Offset(at.dx + (bg ? 7 : 0), at.dy + (bg ? 3 : 0)));
   }
 
@@ -449,14 +567,14 @@ class _MapPainter extends CustomPainter {
     // arazi (640x360 sembolü 1000x345'e ölçeklenir)
     c.save();
     c.scale(1.5625, .9583);
-    c.drawRect(const Rect.fromLTWH(0, 0, 640, 360), _f(const Color(0xFF6E6A48)));
-    _poly(c, [0, 0, 250, 0, 180, 140, 0, 190], const Color(0xFF7B7652));
-    _poly(c, [250, 0, 640, 0, 640, 120, 420, 150, 180, 140], const Color(0xFF5E6844));
-    _poly(c, [0, 190, 180, 140, 420, 150, 330, 360, 0, 360], const Color(0xFF827B55));
-    _poly(c, [420, 150, 640, 120, 640, 360, 330, 360], const Color(0xFF66684A));
+    c.drawRect(const Rect.fromLTWH(0, 0, 640, 360), _f(lc(0xFF6E6A48)));
+    _poly(c, [0, 0, 250, 0, 180, 140, 0, 190], lc(0xFF7B7652));
+    _poly(c, [250, 0, 640, 0, 640, 120, 420, 150, 180, 140], lc(0xFF5E6844));
+    _poly(c, [0, 190, 180, 140, 420, 150, 330, 360, 0, 360], lc(0xFF827B55));
+    _poly(c, [420, 150, 640, 120, 640, 360, 330, 360], lc(0xFF66684A));
     c.drawPath(Path()..moveTo(-10, 300)..cubicTo(150, 230, 260, 190, 360, 120)..cubicTo(460, 50, 560, 20, 660, -10), _s(rgba(0xCBBE9A, .75), 9));
     c.drawPath(Path()..moveTo(180, 360)..cubicTo(230, 280, 300, 250, 330, 190), _s(rgba(0xCBBE9A, .6), 6));
-    c.drawRect(const Rect.fromLTWH(600, 0, 40, 360), _f(const Color(0xFF8F9696)));
+    c.drawRect(const Rect.fromLTWH(600, 0, 40, 360), _f(lc(0xFF8F9696)));
     for (final t in const [Offset(520, 210), Offset(548, 236), Offset(500, 248), Offset(90, 70), Offset(116, 92)]) {
       c.drawCircle(t, 13, _f(rgba(0x3E5A34, .8)));
     }
@@ -470,7 +588,7 @@ class _MapPainter extends CustomPainter {
       c.drawLine(Offset(-200, y), Offset(1200, y), grid);
     }
     // HOME
-    c.drawCircle(const Offset(70, 205), 16, _f(const Color(0xFF0A1417)));
+    c.drawCircle(const Offset(70, 205), 16, _f(const Color(0xFF0A1A20)));
     c.drawCircle(const Offset(70, 205), 16, _s(C.disarm, 2.5));
     drawText(c, 'H', const Offset(70, 205), size: 14, w: FontWeight.w800);
     // formasyon çizgileri
@@ -494,7 +612,7 @@ class _MapPainter extends CustomPainter {
       c.drawLine(tg + const Offset(12, 0), tg + const Offset(24, 0), a);
       c.drawCircle(tg, 3.5, _f(C.amber));
       final d = ((tg - pos[i]).distance * .44).round();
-      _label(c, '$d m · ~${(d / 10).round()} s', tg + const Offset(-52, -48), color: C.amber, size: 11);
+      _label(c, '$d m · ~${(d / 10).round()} s', tg + const Offset(-52, -48), color: D.amber, size: 11);
     }
     if (showMenuMark && menuWorld != null) {
       c.drawCircle(menuWorld!, 12, _s(rgba(0xE8EEF0, .7), 2));
@@ -513,9 +631,9 @@ class _MapPainter extends CustomPainter {
     // WP etiketleri
     for (final e in const [['WP-01', 105.0, 239.0], ['WP-03', 825.0, 39.0], ['WP-02', 845.0, 109.0]]) {
       final r = RRect.fromRectAndRadius(Rect.fromLTWH(e[1] as double, e[2] as double, 70, 22), const Radius.circular(2));
-      c.drawRRect(r, _f(const Color(0xFF223940)));
-      c.drawRRect(r, _s(const Color(0xFF3B5258), 1));
-      drawText(c, e[0] as String, Offset((e[1] as double) + 35, (e[2] as double) + 11), size: 11, color: const Color(0xFFC8D6D9), ls: 1.1);
+      c.drawRRect(r, _f(lc(0xFF223940)));
+      c.drawRRect(r, _s(lc(0xFF3B5258), 1));
+      drawText(c, e[0] as String, Offset((e[1] as double) + 35, (e[2] as double) + 11), size: 11, color: lc(0xFFC8D6D9), ls: 1.1);
     }
     c.restore();
   }

@@ -70,7 +70,7 @@ class _SwarmMapState extends State<SwarmMap> {
           height: 34,
           decoration: BoxDecoration(
             color: rgba(0x0A1417, .85),
-            border: Border.all(color: const Color(0xFF3B5258)),
+            border: Border.all(color: lc(0xFF3B5258)),
             borderRadius: BorderRadius.circular(2),
           ),
           child: Icon(icon, size: 18, color: C.text),
@@ -114,7 +114,7 @@ class _SwarmMapState extends State<SwarmMap> {
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
                   color: rgba(0x0A1417, .85),
-                  border: Border.all(color: const Color(0xFF3B5258)),
+                  border: Border.all(color: lc(0xFF3B5258)),
                   borderRadius: BorderRadius.circular(2),
                 ),
                 child: Text(

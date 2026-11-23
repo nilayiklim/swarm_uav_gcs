@@ -37,34 +37,45 @@ void drawText(Canvas c, String t, Offset at,
 ui.Gradient _lin(Offset a, Offset b, List<Color> colors, [List<double>? stops]) =>
     ui.Gradient.linear(a, b, colors, stops);
 
-/// Uçak silüeti (100x100 kutuda).
-final Path _planePath = Path()
-  ..moveTo(50, 6)
-  ..lineTo(56, 40)
-  ..lineTo(96, 62)
-  ..lineTo(96, 70)
-  ..lineTo(56, 58)
-  ..lineTo(54, 84)
-  ..lineTo(66, 92)
-  ..lineTo(66, 97)
-  ..lineTo(50, 93)
-  ..lineTo(34, 97)
-  ..lineTo(34, 92)
-  ..lineTo(46, 84)
-  ..lineTo(44, 58)
-  ..lineTo(4, 70)
-  ..lineTo(4, 62)
-  ..lineTo(44, 40)
-  ..close();
-
+/// Çok rotorlu (quadcopter) İHA – tepeden görünüm, 100x100 kutuda, burun yukarı.
 void drawPlane(Canvas c, Offset at, double rotDeg, double size, Color color) {
   c.save();
   c.translate(at.dx, at.dy);
   c.rotate(_rad(rotDeg));
   c.scale(size / 100);
   c.translate(-50, -50);
-  c.drawPath(_planePath, _fill(color));
+  final arm = _line(color, 7)..strokeCap = StrokeCap.round;
+  const centers = [Offset(20, 20), Offset(80, 20), Offset(20, 80), Offset(80, 80)];
+  c.drawLine(const Offset(20, 20), const Offset(80, 80), arm);
+  c.drawLine(const Offset(80, 20), const Offset(20, 80), arm);
+  for (int i = 0; i < centers.length; i++) {
+    c.drawCircle(centers[i], 17, _fill(rgba(0x0A1417, .55)));
+    c.drawCircle(centers[i], 17, _line(color, 4));
+    c.drawCircle(centers[i], 4, _fill(color));
+  }
+  c.drawRRect(RRect.fromRectAndRadius(const Rect.fromLTWH(36, 32, 28, 40), const Radius.circular(9)), _fill(color));
+  c.drawRRect(
+      RRect.fromRectAndRadius(const Rect.fromLTWH(36, 32, 28, 40), const Radius.circular(9)), _line(rgba(0x06210F), 2));
+  // burun işareti
+  c.drawPath(
+    Path()
+      ..moveTo(50, 8)
+      ..lineTo(58, 26)
+      ..lineTo(42, 26)
+      ..close(),
+    _fill(color),
+  );
   c.restore();
+}
+
+/// Küçük drone (multicopter) simgesi – üst çubuk logosu vb.
+class DroneIconPainter extends CustomPainter {
+  DroneIconPainter(this.color);
+  final Color color;
+  @override
+  void paint(Canvas c, Size s) => drawPlane(c, Offset(s.width / 2, s.height / 2), 0, math.min(s.width, s.height), color);
+  @override
+  bool shouldRepaint(covariant DroneIconPainter o) => o.color != color;
 }
 
 /// viewBox (vw x vh) -> boyuta "slice" (kapla) yerleştirir.
@@ -181,26 +192,7 @@ class CompassPainter extends CustomPainter {
         ..close(),
       _fill(C.red),
     );
-    final plane = Path()
-      ..moveTo(80, 62)
-      ..lineTo(83, 78)
-      ..lineTo(96, 86)
-      ..lineTo(96, 89)
-      ..lineTo(83, 85)
-      ..lineTo(82, 96)
-      ..lineTo(87, 99)
-      ..lineTo(87, 101)
-      ..lineTo(80, 99.5)
-      ..lineTo(73, 101)
-      ..lineTo(73, 99)
-      ..lineTo(78, 96)
-      ..lineTo(77, 85)
-      ..lineTo(64, 89)
-      ..lineTo(64, 86)
-      ..lineTo(77, 78)
-      ..close();
-    c.drawPath(plane, _fill(C.green));
-    c.drawPath(plane, _line(rgba(0x06210F), .6));
+    drawPlane(c, const Offset(80, 82), 0, 30, C.green);
     final box = RRect.fromRectAndRadius(const Rect.fromLTWH(62, 104, 36, 16), const Radius.circular(2));
     c.drawRRect(box, _fill(rgba(0x050B0D)));
     c.drawRRect(box, _line(C.green, 1));
@@ -677,6 +669,27 @@ class MapPainter extends CustomPainter {
     drawText(c, 'İHA-2', const Offset(600, 258), size: 13, w: FontWeight.w600);
     drawText(c, 'İHA-3', const Offset(540, 368), size: 13, w: FontWeight.w600, color: rgba(0xFF8480));
 
+    // iniş alanları (kırmızı / mavi) + kamera tespit durumu
+    void zone(Offset at, Color col, String name, String st, Color stCol) {
+      c.drawCircle(at, 40, _fill(col.withAlpha(46)));
+      c.drawCircle(at, 40, _line(col, 2.5));
+      c.drawCircle(at, 24, _line(col.withAlpha(150), 1.5));
+      c.drawCircle(at, 5, _fill(col));
+      drawText(c, name, at + const Offset(0, 58), size: 12, w: FontWeight.w700, color: col);
+      drawText(c, st, at + const Offset(0, 75), size: 11, w: FontWeight.w600, color: stCol);
+    }
+
+    zone(const Offset(360, 440), C.red, 'KIRMIZI İNİŞ ALANI', '○ Kamera: Bekleniyor', C.amber);
+    zone(const Offset(640, 440), C.blue, 'MAVİ İNİŞ ALANI', '● Kamera: Tespit Edildi', C.green);
+    // İHA-3 → mavi alana iniş yönü
+    final guide = _line(rgba(0x4DB2FF, .8), 2);
+    const from = Offset(492, 348), to = Offset(640, 440);
+    final dv = to - from;
+    for (double d = 0; d < dv.distance - 40; d += 14) {
+      final a = from + dv / dv.distance * d;
+      c.drawLine(a, a + dv / dv.distance * 7, guide);
+    }
+
     if (selected >= 0 && selected < uavPos.length) {
       final p = uavPos[selected];
       c.drawCircle(p, 40, _line(rgba(0x4DB2FF, .9), 2));
@@ -787,40 +800,91 @@ class RadarPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter o) => false;
 }
 
+/// Arkadan görünümlü tek bir multikopter; (cx, cy) gövde merkezi, sc ölçek (46 birim genişlik), op opaklık.
+void drawRearQuad(Canvas c, double cx, double cy, double sc, double op, Color color) {
+  c.save();
+  c.translate(cx, cy);
+  c.scale(sc, sc);
+  final full = color.withAlpha((255 * op).round());
+  final half = color.withAlpha((255 * op * .5).round());
+  Paint ln(Color k, double w) => _line(k, w, cap: StrokeCap.round);
+  final fl = _fill(full);
+  // uzak taraftaki kollar ve rotorlar (soluk)
+  c.drawLine(const Offset(-15, -9.5), const Offset(-6, -9.5), ln(half, 2));
+  c.drawLine(const Offset(6, -9.5), const Offset(15, -9.5), ln(half, 2));
+  c.drawLine(const Offset(-3.5, -2), const Offset(-10.5, -7), ln(half, 1.8));
+  c.drawLine(const Offset(3.5, -2), const Offset(10.5, -7), ln(half, 1.8));
+  // yakın kollar ve rotorlar
+  c.drawLine(const Offset(-6, 0), const Offset(-18, -4), ln(full, 2.2));
+  c.drawLine(const Offset(6, 0), const Offset(18, -4), ln(full, 2.2));
+  c.drawLine(const Offset(-23, -6.5), const Offset(-13, -6.5), ln(full, 2.6));
+  c.drawLine(const Offset(13, -6.5), const Offset(23, -6.5), ln(full, 2.6));
+  c.drawRRect(RRect.fromRectAndRadius(const Rect.fromLTWH(-19.5, -5, 3, 3.2), const Radius.circular(1)), fl);
+  c.drawRRect(RRect.fromRectAndRadius(const Rect.fromLTWH(16.5, -5, 3, 3.2), const Radius.circular(1)), fl);
+  // gövde, kamera/gimbal, iniş takımı
+  c.drawRRect(RRect.fromRectAndRadius(const Rect.fromLTWH(-8, -4.2, 16, 9.4), const Radius.circular(3.6)), fl);
+  c.drawCircle(const Offset(0, 7), 2.6, fl);
+  final legs = Path()
+    ..moveTo(-5.5, 5.4)
+    ..lineTo(-8.5, 11)
+    ..lineTo(-3.5, 11)
+    ..moveTo(5.5, 5.4)
+    ..lineTo(8.5, 11)
+    ..lineTo(3.5, 11);
+  c.drawPath(legs, ln(full, 1.8));
+  c.restore();
+}
+
+/// Yandan görünümlü multikopter (burun sağda); rotDeg saat yönünde derece (burun yukarı = negatif).
+void drawSideQuad(Canvas c, Offset at, double sc, double rotDeg, Color color) {
+  c.save();
+  c.translate(at.dx, at.dy);
+  c.rotate(_rad(rotDeg));
+  c.scale(sc, sc);
+  final fl = _fill(color);
+  c.drawRRect(RRect.fromRectAndRadius(const Rect.fromLTWH(-13, -3.5, 26, 8), const Radius.circular(3)), fl);
+  c.drawCircle(const Offset(13, 2), 2.6, fl);
+  c.drawLine(const Offset(-19, -9), const Offset(19, -9), _line(color, 2.6, cap: StrokeCap.round));
+  final mast = _line(color, 2, cap: StrokeCap.round);
+  c.drawLine(const Offset(-6, -3.5), const Offset(-6, -9), mast);
+  c.drawLine(const Offset(6, -3.5), const Offset(6, -9), mast);
+  final legs = Path()
+    ..moveTo(-8, 4.5)
+    ..lineTo(-11, 10)
+    ..lineTo(-3, 10)
+    ..moveTo(8, 4.5)
+    ..lineTo(11, 10)
+    ..lineTo(3, 10);
+  c.drawPath(legs, _line(color, 1.8, cap: StrokeCap.round));
+  c.restore();
+}
+
+/// Şartname Şekil 3: formasyonlar, sürünün arkasından bakış açısıyla üç çoklu-rotorlu İHA olarak çizilir.
+/// kind: 0 = Ok Başı (uç önde → uzakta, küçük), 1 = V (orta arkada → yakında, büyük), 2 = Çizgi (yan yana).
 class FormationIconPainter extends CustomPainter {
-  FormationIconPainter(this.kind, {this.color = C.green});
-  final int kind; // 0 V, 1 ok, 2 çizgi
+  FormationIconPainter(this.kind, {Color? color}) : color = color ?? C.green;
+  final int kind;
   final Color color;
+
+  /// Arkadan görünümlü tek bir multikopter (bkz. [drawRearQuad]).
+  void _quad(Canvas c, double cx, double cy, double sc, double op) => drawRearQuad(c, cx, cy, sc, op, color);
 
   @override
   void paint(Canvas c, Size s) {
     c.save();
-    c.scale(s.width / 58, s.height / 38);
-    final l = _line(color, 2);
-    final f = _fill(color);
+    c.scale(s.width / 100, s.height / 40);
     if (kind == 0) {
-      c.drawPath(
-        Path()
-          ..moveTo(8, 6)
-          ..lineTo(29, 30)
-          ..lineTo(50, 6),
-        l,
-      );
-      for (final o in const [Offset(8, 6), Offset(29, 30), Offset(50, 6)]) {
-        c.drawCircle(o, 4.5, f);
-      }
+      _quad(c, 50, 17, .40, .92);
+      _quad(c, 19, 26, .65, 1);
+      _quad(c, 81, 26, .65, 1);
     } else if (kind == 1) {
-      c.drawLine(const Offset(8, 19), const Offset(46, 19), l);
-      c.drawLine(const Offset(46, 19), const Offset(34, 8), l);
-      c.drawLine(const Offset(46, 19), const Offset(34, 30), l);
-      for (final o in const [Offset(8, 19), Offset(34, 8), Offset(34, 30)]) {
-        c.drawCircle(o, 4.5, f);
-      }
+      _quad(c, 15, 16, .40, .92);
+      _quad(c, 85, 16, .40, .92);
+      _quad(c, 50, 26, .65, 1);
     } else {
-      c.drawLine(const Offset(8, 19), const Offset(50, 19), l);
-      for (final o in const [Offset(8, 19), Offset(29, 19), Offset(50, 19)]) {
-        c.drawCircle(o, 4.5, f);
-      }
+      _quad(c, 17, 22, .55, 1);
+      _quad(c, 50, 22, .55, 1);
+      _quad(c, 83, 22, .55, 1);
     }
     c.restore();
   }
@@ -969,8 +1033,8 @@ class QrCameraPainter extends CustomPainter {
     ]) {
       c.drawRect(r, k);
     }
-    c.drawRect(const Rect.fromLTWH(322, 207, 156, 156), _line(C.green, 3));
-    final b = _line(C.green, 6);
+    c.drawRect(const Rect.fromLTWH(322, 207, 156, 156), _line(C.amber, 3)); // okunmakta olan QR (amber)
+    final b = _line(C.amber, 6);
     c.drawPath(
       Path()
         ..moveTo(322, 235)

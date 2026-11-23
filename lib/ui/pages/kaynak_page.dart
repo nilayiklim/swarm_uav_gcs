@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../widgets.dart';
 
-/// KAYNAK – içerik henüz belirlenmedi (başlık, İHA kutucukları ve Acil Şerit hazır).
+/// KAYNAK – içerik alanı bilerek boş bırakıldı (başlık, İHA şeridi ve alt şerit çerçevede kalır).
 class KaynakPage extends StatelessWidget {
   const KaynakPage({super.key});
 
@@ -9,7 +9,6 @@ class KaynakPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return const PageFrame(
       title: 'SÜRÜ İHA // KAYNAK',
-      bar: EmVariant.standard,
       body: SizedBox.expand(),
     );
   }

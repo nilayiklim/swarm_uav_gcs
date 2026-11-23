@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../app_state.dart';
 import '../theme.dart';
 import '../uav_data.dart';
 import '../widgets.dart';
@@ -20,19 +21,28 @@ class _Ev {
   final int n; // x5 gibi tekrar sayısı
 }
 
-const _logs = <List<_Ev>>[
+/// Log satırları. Formasyon adı ve QR numaraları seçili takımın bloğundan türetilir
+/// (son çözülen QR'ın "team" tablosu); gerçek veride loglar telemetriden gelir. Sabit rota yoktur.
+List<List<_Ev>> _logsFor(int team) {
+  final q = kQrTasks.last;
+  final st = q.stepFor(team);
+  final nx = q.nextFor(team);
+  final fn = st.frm == 'ok' ? 'Ok Başı' : (st.frm == 'v' ? 'V-Tipi' : 'Çizgi');
+  final nxs = nx == 0 ? '0 (son)' : '$nx';
+  final live = 'QR-$nx';
+  return [
   [
     _Ev('14:12:30', 'TELEMETRİ', _Lv.info, 'Telemetri aktif · 4.8 Hz · gecikme 84 ms'),
-    _Ev('14:12:26', 'QR', _Lv.warn, 'QR-2 okunuyor · güven %64'),
-    _Ev('14:12:22', 'FORMASYON', _Lv.ok, 'Formasyon korundu (V-Tipi) · hata 0.2 m', 5),
-    _Ev('14:12:20', 'QR', _Lv.ok, 'QR-1 çözüldü · FORM=V · güven %97'),
-    _Ev('14:12:18', 'QR', _Lv.info, 'QR-1 okunuyor'),
+    _Ev('14:12:22', 'FORMASYON', _Lv.ok, 'Formasyon korundu ($fn) · hata 0.2 m', 5),
+    _Ev('14:12:14', 'QR', _Lv.warn, '$live okunuyor · güven %64 · 2. deneme'),
     _Ev('14:12:10', 'WAYPOINT', _Lv.ok, 'WP-02 geçildi'),
-    _Ev('14:12:05', 'FORMASYON', _Lv.ok, 'Formasyon korundu (V-Tipi)', 5),
-    _Ev('14:12:02', 'FORMASYON', _Lv.warn, 'Formasyon sapması (V-Tipi) · 1.4 m'),
+    _Ev('14:12:05', 'FORMASYON', _Lv.ok, 'Formasyon korundu ($fn)', 5),
+    _Ev('14:12:02', 'FORMASYON', _Lv.warn, 'Formasyon sapması ($fn) · 1.4 m'),
     _Ev('14:11:58', 'KOMUT', _Lv.info, 'Hız komutu alındı · 10.1 m/s'),
     _Ev('14:11:52', 'GPS', _Lv.ok, 'GPS fix 3D · 12 uydu · HDOP 1.0'),
+    _Ev('14:11:50', 'QR', _Lv.ok, 'QR-1 çözüldü · $fn · sonraki QR $nxs · güven %97'),
     _Ev('14:11:48', 'BATARYA', _Lv.info, 'Batarya %88 · 15.8 V'),
+    _Ev('14:11:46', 'QR', _Lv.info, 'QR-1 okunuyor'),
     _Ev('14:11:44', 'WAYPOINT', _Lv.ok, 'WP-01 geçildi'),
     _Ev('14:11:40', 'BAĞLANTI', _Lv.info, 'Zenoh bağlantısı kuruldu · 12 ms'),
     _Ev('14:11:36', 'SİSTEM', _Lv.info, 'ARM edildi · GUIDED modu'),
@@ -41,11 +51,11 @@ const _logs = <List<_Ev>>[
   [
     _Ev('14:12:30', 'TELEMETRİ', _Lv.info, 'Telemetri aktif · 4.8 Hz · gecikme 91 ms'),
     _Ev('14:12:24', 'BATARYA', _Lv.info, 'Batarya %76 · 15.1 V'),
-    _Ev('14:12:22', 'FORMASYON', _Lv.ok, 'Formasyon korundu (V-Tipi) · hata 0.3 m', 5),
+    _Ev('14:12:22', 'FORMASYON', _Lv.ok, 'Formasyon korundu ($fn) · hata 0.3 m', 5),
     _Ev('14:12:15', 'GPS', _Lv.ok, 'Uydu sayısı 11 · HDOP 1.1'),
     _Ev('14:12:10', 'WAYPOINT', _Lv.ok, 'WP-02 geçildi'),
-    _Ev('14:12:05', 'FORMASYON', _Lv.ok, 'Formasyon korundu (V-Tipi)', 5),
-    _Ev('14:12:02', 'FORMASYON', _Lv.warn, 'Formasyon sapması (V-Tipi) · 1.1 m'),
+    _Ev('14:12:05', 'FORMASYON', _Lv.ok, 'Formasyon korundu ($fn)', 5),
+    _Ev('14:12:02', 'FORMASYON', _Lv.warn, 'Formasyon sapması ($fn) · 1.1 m'),
     _Ev('14:11:58', 'KOMUT', _Lv.info, 'Hız komutu alındı · 10.1 m/s'),
     _Ev('14:11:52', 'GPS', _Lv.ok, 'GPS fix 3D · 11 uydu · HDOP 1.1'),
     _Ev('14:11:47', 'TELEMETRİ', _Lv.info, 'Paket kaybı %0.4 · kabul edilebilir'),
@@ -60,9 +70,9 @@ const _logs = <List<_Ev>>[
     _Ev('14:12:24', 'BATARYA', _Lv.warn, 'Batarya %64 · 14.6 V · düşük seviyeye yaklaşıyor'),
     _Ev('14:12:18', 'FORMASYON', _Lv.warn, 'Sürüden ayrıldı · mavi alana yönleniyor'),
     _Ev('14:12:16', 'KOMUT', _Lv.info, 'Ayrılma komutu alındı'),
-    _Ev('14:12:12', 'FORMASYON', _Lv.warn, 'Formasyon sapması (V-Tipi) · 2.1 m'),
+    _Ev('14:12:12', 'FORMASYON', _Lv.warn, 'Formasyon sapması ($fn) · 2.1 m'),
     _Ev('14:12:10', 'WAYPOINT', _Lv.ok, 'WP-02 geçildi'),
-    _Ev('14:12:05', 'QR', _Lv.err, 'QR-3 okunamadı · 3 deneme'),
+    _Ev('14:12:05', 'QR', _Lv.err, '$live okunamadı · İHA-3 kamerası · 3 deneme'),
     _Ev('14:12:01', 'TELEMETRİ', _Lv.warn, 'Telemetri gecikmesi 240 ms'),
     _Ev('14:11:58', 'KOMUT', _Lv.info, 'Hız komutu alındı · 10.1 m/s'),
     _Ev('14:11:52', 'GPS', _Lv.ok, 'GPS fix 3D · 11 uydu · HDOP 1.1'),
@@ -72,7 +82,8 @@ const _logs = <List<_Ev>>[
     _Ev('14:11:36', 'SİSTEM', _Lv.info, 'ARM edildi · GUIDED modu'),
     _Ev('14:11:30', 'SİSTEM', _Lv.info, 'Ön uçuş kontrolleri tamam'),
   ],
-];
+  ];
+}
 
 const _cats = ['Tümü', 'TELEMETRİ', 'QR', 'FORMASYON', 'WAYPOINT', 'KOMUT', 'GPS', 'BATARYA', 'BAĞLANTI', 'SİSTEM', 'DURUM'];
 
@@ -84,10 +95,26 @@ class _LogPageState extends State<LogPage> {
   bool _live = true;
   String _toast = '';
 
+  void _onTeam() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    teamId.addListener(_onTeam);
+  }
+
+  @override
+  void dispose() {
+    teamId.removeListener(_onTeam);
+    super.dispose();
+  }
+
   Color _dot(_Lv l) => switch (l) { _Lv.info => C.blue, _Lv.ok => C.green, _Lv.warn => C.amber, _Lv.err => C.red };
   Color _txt(_Lv l) => switch (l) { _Lv.warn => C.amber, _Lv.err => C.red, _ => C.text };
 
-  int _count(_Lv l) => _logs.expand((e) => e).where((e) => e.lv == l).length;
+  int _count(_Lv l) => _logsFor(teamId.value).expand((e) => e).where((e) => e.lv == l).length;
 
   bool _show(_Ev e) =>
       (_lv == null || e.lv == _lv) &&
@@ -103,18 +130,25 @@ class _LogPageState extends State<LogPage> {
       );
 
   Widget _col(int u) {
-    final all = _logs[u];
+    final all = _logsFor(teamId.value)[u];
     final list = all.where(_show).toList();
     final info = kUavs[u];
     final warn = all.where((e) => e.lv == _Lv.warn).length;
     final err = all.where((e) => e.lv == _Lv.err).length;
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(2),
-        border: Border.all(color: info.bad ? const Color(0xFFF0443E) : C.panelLine),
-        gradient: const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF183137), Color(0xFF12232A)]),
-      ),
+      decoration: isLight
+          ? BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: info.bad ? const Color(0xFFF2B8B8) : L.line),
+              boxShadow: L.shadow,
+            )
+          : BoxDecoration(
+              borderRadius: BorderRadius.circular(2),
+              border: Border.all(color: info.bad ? const Color(0xFFF0443E) : C.panelLine),
+              gradient: const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF183137), Color(0xFF12232A)]),
+            ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -143,7 +177,7 @@ class _LogPageState extends State<LogPage> {
                           padding: const EdgeInsets.symmetric(horizontal: 4),
                           decoration: BoxDecoration(
                             color: e.lv == _Lv.warn ? rgba(0xF5B73D, .06) : (e.lv == _Lv.err ? rgba(0xFF5A55, .08) : null),
-                            border: const Border(bottom: BorderSide(color: Color(0xFF1E3237))),
+                            border: Border(bottom: BorderSide(color: lc(0xFF1E3237))),
                           ),
                           child: Row(
                             children: [
@@ -157,7 +191,7 @@ class _LogPageState extends State<LogPage> {
                                 gap(6),
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                                  decoration: BoxDecoration(border: Border.all(color: const Color(0xFF33505A)), borderRadius: BorderRadius.circular(2)),
+                                  decoration: BoxDecoration(border: Border.all(color: lc(0xFF33505A)), borderRadius: BorderRadius.circular(2)),
                                   child: Text('x${e.n}', style: ts(10.5, color: C.mut2)),
                                 ),
                               ],
@@ -194,7 +228,7 @@ class _LogPageState extends State<LogPage> {
                 _chip('HATA ${_count(_Lv.err)}', _lv == _Lv.err, () => setState(() => _lv = _lv == _Lv.err ? null : _Lv.err), color: C.red),
                 gap(8),
                 PopupMenuButton<String>(
-                  color: const Color(0xFF0C171A),
+                  color: lc(0xFF0C171A),
                   onSelected: (v) => setState(() => _cat = v),
                   itemBuilder: (_) => [for (final c in _cats) PopupMenuItem(value: c, height: 34, child: Text(c, style: ts(13)))],
                   child: Padding(padding: const EdgeInsets.only(right: 8), child: Tag('Kategori: $_cat ▾', height: 32, fontSize: 12, ls: .3)),
@@ -204,7 +238,7 @@ class _LogPageState extends State<LogPage> {
                   height: 32,
                   margin: const EdgeInsets.only(right: 24),
                   padding: const EdgeInsets.symmetric(horizontal: 8),
-                  decoration: BoxDecoration(color: C.dark, border: Border.all(color: const Color(0xFF33505A)), borderRadius: BorderRadius.circular(2)),
+                  decoration: BoxDecoration(color: C.dark, border: Border.all(color: lc(0xFF33505A)), borderRadius: BorderRadius.circular(2)),
                   child: TextField(
                     onChanged: (v) => setState(() => _q = v),
                     style: ts(12.5),
@@ -263,7 +297,7 @@ class _ColoredTag extends StatelessWidget {
       alignment: Alignment.center,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(2),
-        color: on ? color!.withAlpha(48) : const Color(0xFF18292E),
+        color: on ? color!.withAlpha(48) : lc(0xFF18292E),
         border: Border.all(color: on ? color! : color!.withAlpha(110)),
       ),
       child: Text(text, style: ts(12, color: color!, ls: 1)),
